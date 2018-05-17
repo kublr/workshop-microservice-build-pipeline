@@ -1,0 +1,69 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: build
+  name: nexus
+  labels:
+    app: nexus
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  strategy:
+    # we do not want 2 instances running in parallel during update
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: nexus
+  template:
+    metadata:
+      labels:
+        app: nexus
+      annotations:
+    spec:
+      initContainers:
+      - name: set-volume-owner
+        image: alpine
+        command:
+        - /bin/sh
+        - -c
+        - chown 200:200 /nexus-data
+        volumeMounts:
+        - name: nexus-data
+          mountPath: /nexus-data
+          subPath: nexus-data
+      containers:
+      - name: nexus
+        image: sonatype/nexus3:latest
+        resources:
+          requests:
+            cpu: 10m
+            memory: 2Gi
+          limits:
+            memory: 2Gi
+        livenessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: 360
+          timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: http
+          timeoutSeconds: 5
+        ports:
+        - name: http
+          containerPort: 8081
+        - name: docker0
+          containerPort: 5000
+        env:
+        - name: INSTALL4J_ADD_VM_PARAMS
+          value: -server -Xms1200m -Xmx1200m -XX:MaxDirectMemorySize=2g
+        volumeMounts:
+        - name: nexus-data
+          mountPath: /nexus-data
+          subPath: nexus-data
+      volumes:
+      - name: nexus-data
+        persistentVolumeClaim:
+          claimName: efs

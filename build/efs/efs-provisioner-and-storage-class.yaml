@@ -1,0 +1,70 @@
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: aws-efs-provisioner
+  namespace: kube-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: aws-efs-provisioner
+    spec:
+      terminationGracePeriodSeconds: 5
+#      serviceAccount: aws-efs-provisioner
+      initContainers:
+      - name: discover
+        image: mesosphere/aws-cli
+        command:
+        - sh
+        - -c
+        - |
+          apk --no-cache add curl
+          export AWS_DEFAULT_REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep '\"region\"' | cut -d\" -f4)
+          export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+          export KUBERNETES_CLUSTER=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query  "Reservations[*].Instances[*].Tags[? @.Key == 'KubernetesCluster'].Value" --output text)
+          export VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:KubernetesCluster,Values=${KUBERNETES_CLUSTER}" --query "Vpcs[*].VpcId" --output=text)
+          export AWS_SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query "join(',',Subnets[?(@.Tags[?(@.Key=='aws:cloudformation:logical-id' && starts_with(@.Value, 'SubnetNodePublic'))])].SubnetId)" --output text)
+          export AWS_SECURITY_GROUP=$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=default" --query "SecurityGroups[*].GroupId" --output text)
+          echo "export AWS_REGION=${AWS_DEFAULT_REGION}" > /init-config/config
+          echo "export AWS_SUBNETS=${AWS_SUBNETS}" >> /init-config/config
+          echo "export AWS_SECURITY_GROUP=${AWS_SECURITY_GROUP}" >> /init-config/config
+          echo Discovered
+          cat /init-config/config
+        volumeMounts:
+        - mountPath: /init-config
+          name: init-config
+      containers:
+      - name: aws-efs-provisioner
+        image: previousnext/k8s-aws-efs:2.2.0
+        command:
+        - sh
+        - -c
+        - source /init-config/config ; exec k8s-aws-efs
+        env:
+        - name:  EFS_PERFORMANCE
+          value: "generalPurpose"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-efs-provisioner
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-efs-provisioner
+              key: AWS_SECRET_ACCESS_KEY
+        volumeMounts:
+        - mountPath: /init-config
+          name: init-config
+      volumes:
+      - name: init-config
+        emptyDir: {}
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: aws-efs-gp
+provisioner: efs.aws.skpr.io/generalPurpose

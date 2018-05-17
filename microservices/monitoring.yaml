@@ -1,0 +1,67 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: monitoring-istio-mesh
+  namespace: istio-system
+  annotations:
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "42422"
+    prometheus.io/scrape: "true"
+spec:
+  ports:
+  - name: prometheus
+    port: 42422
+    targetPort: 42422
+  selector:
+    istio: mixer
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: monitoring-istio-envoy
+  namespace: istio-system
+  annotations:
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "9102"
+    prometheus.io/scrape: "true"
+spec:
+  ports:
+  - name: statsd-prom
+    port: 9102
+    targetPort: 9102
+  selector:
+    istio: mixer
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: monitoring-istio-mixer
+  namespace: istio-system
+  annotations:
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "9093"
+    prometheus.io/scrape: "true"
+spec:
+  ports:
+  - name: http-monitoring
+    port: 9093
+    targetPort: 9093
+  selector:
+    istio: mixer
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: monitoring-istio-pilot
+  namespace: istio-system
+  annotations:
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "9093"
+    prometheus.io/scrape: "true"
+spec:
+  ports:
+  - name: http-monitoring
+    port: 9093
+    targetPort: 9093
+  selector:
+    istio: pilot

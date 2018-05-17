@@ -1,0 +1,76 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: build
+  name: jenkins
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  strategy:
+    # we do not want 2 instances running in parallel during update
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      initContainers:
+      - name: set-volume-owner
+        image: alpine
+        command:
+        - /bin/sh
+        - -c
+        - chown 1000:1000 /var/jenkins_home
+        volumeMounts:
+        - name: jenkins-data
+          mountPath: /var/jenkins_home
+          subPath: jenkins-data
+      # - name: install-plugins
+      #   image: jenkins/jenkins:latest
+      #   command:
+      #   - /bin/sh
+      #   - -c
+      #   - /usr/local/bin/install-plugins.sh kubernetes:latest workflow-aggregator:latest timestamper:latest git:latest
+      #   volumeMounts:
+      #   - name: jenkins-data
+      #     mountPath: /var/jenkins_home
+      #     subPath: jenkins-data
+      containers:
+      - name: jenkins
+        image: jenkins/jenkins:latest
+        resources:
+          requests:
+            cpu: 50m
+            memory: 1Gi
+          limits:
+            memory: 1Gi
+        livenessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: 120
+          timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: http
+          timeoutSeconds: 5
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: jnlp
+          containerPort: 50000
+        env:
+        - name: JAVA_OPTS
+          value: -server -Xmx512m -Djenkins.install.runSetupWizard=false -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
+        volumeMounts:
+        - name: jenkins-data
+          mountPath: /var/jenkins_home
+          subPath: jenkins-data
+      volumes:
+      - name: jenkins-data
+        persistentVolumeClaim:
+          claimName: efs

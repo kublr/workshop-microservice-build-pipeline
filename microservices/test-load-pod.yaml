@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webui-test-load
+spec:
+  terminationGracePeriodSeconds: 0
+  containers:
+  - image: dos65/httperf
+    name: main
+    command:
+    - httperf
+    - --server=af917ccdb5be011e881220ae826d3a5a-1158974335.us-east-1.elb.amazonaws.com
+    - --uri=/webui-master/
+    - --rate=10
+    - --num-calls=1000000

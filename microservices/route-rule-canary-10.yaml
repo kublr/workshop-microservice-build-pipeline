@@ -1,0 +1,15 @@
+apiVersion: config.istio.io/v1alpha2
+kind: RouteRule
+metadata:
+  name: colorer-canary
+spec:
+  destination:
+    name: colorer
+  route:
+  - weight: 90
+    destination:
+      name: colorer
+  - weight: 10
+    destination:
+      name: colorer
+      namespace: featuredemo

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: build
+  name: jenkins
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 8080
+    nodePort: 30080
+    targetPort: http
+  - name: jnlp
+    port: 50000
+    nodePort: 30500
+    targetPort: jnlp
+  selector:
+    app: jenkins
