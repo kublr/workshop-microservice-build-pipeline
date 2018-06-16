@@ -79,11 +79,11 @@ Make sure that you have Kublr cloud URL and credentials to login.
 
     *   Masters: 1
 
-    *   Instance Type: `m3.medium`
+    *   Instance Type: `t2.medium`
 
     *   Nodes: 2
 
-    *   Instance Type: `m4.large`
+    *   Instance Type: `t2.large`
 
     *   In "Monitoring" section click `Add monitoring` and select `Self-hosted
         Prometheus / Grafana`
@@ -127,7 +127,7 @@ following command:
 kubectl get nodes
 ```
 
-You should be able to see 2 nodes - one master and 1 worker node.
+You should be able to see 3 nodes - one master and 2 worker node.
 
 ### 2.2. Accessing Kubernetes cluster API
 
@@ -459,7 +459,7 @@ Istio set up its own ingress controller with a cloud specific load balancer.
 Use the following command to find Istio ingress controller endpoint:
 
 ```
-kubectl get service -n istio-system istio-ingress -o 'jsnpath={.status.loadBalancer.ingress[0].hostname}'
+kubectl get service -n istio-system istio-ingress -o 'jsonpath={.status.loadBalancer.ingress[0].hostname}'
 ```
 
 This will print Load Balancer address such as
