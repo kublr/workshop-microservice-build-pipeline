@@ -7,13 +7,12 @@
 If you are plannig to use local Kublr Demo box, start it if not yet started.
 Detailed instructions on setting up Kublr Demo and running it are
 available at [https://kublr.com/demo/](https://kublr.com/demo/) and
-[https://docs.kublr.com/installationguide/bootstrap/](https://docs.kublr.com/installationguide/bootstrap/).
+[https://docs.kublr.com/quickstart/kublr-in-a-box/](https://docs.kublr.com/quickstart/kublr-in-a-box/).
 
-Starting Kublr demo for the first time includes downloading a ~1Gb vagrant box
-file, so it may take long time on a slow network.
+Starting Kublr demo for the first time includes downloading a ~2Gb docker image, so it may take long time on a slow network.
 
-After the box file is downloaded, Kublr demo virtual machine starts, which may
-take up to 5 minutes.
+After the docker image is downloaded, Kublr demo container starts, which may
+take up to 1 minutes.
 
 It is recommended to install and run Kublr demo once before the session,
 preferably while being connected to a fast Internet connection.
@@ -28,7 +27,7 @@ Make sure that you have Kublr cloud URL and credentials to login.
 
 1.  Open Kublr console
 
-    Use URL [https://localhost:9443/](https://localhost:9443/) for local Kublr
+    Use URL [http://localhost:9080/](http://localhost:9080/) for local Kublr
     demo box.
 
     Use provided URL for Kublr cloud.
@@ -96,8 +95,21 @@ Make sure that you have Kublr cloud URL and credentials to login.
         <summary><img src="kublr-create-cluster-top.png" alt="Cluster creation wizard" width="100" border="1"/></summary>
         <img src="kublr-create-cluster.png" alt="Cluster creation wizard" width="50%"/>
     </details>
+    
+5. Customize cluster spec, increases memory limits for k8s api server:
 
-    Click "Confirm and Install" button to start creation of a new cluster.
+```
+spec:
+  master:
+    kublrAgentConfig:
+      kublr:
+        resources:
+          kube_api_server:
+            limits:
+              memory: 1024Mi
+```
+  
+Click "Create cluster" button to start creation of a new cluster.
 
 Cluster creation usually takes 10-20 minutes. You can track progress of this
 process via cluster overview, status, and events pages:
@@ -170,7 +182,7 @@ command line:
 
 ```
 kubectl get secrets \
-  -n kube-system app-monitoring-grafana \
+  -n kube-system kublr-monitoring-grafana \
   -o 'jsonpath={.data.grafana-admin-password}' \
   | base64 --decode
 ```
@@ -248,7 +260,7 @@ by the provisioner.
 kubectl apply -f build/efs/efs-pvc.yaml
 ```
 
-It takes about 3 minutes to complete provisioning of a EFS file system.
+It takes about 3-6 minutes to complete provisioning of a EFS file system.
 
 You can check that the persistent volume claim is created and bound via
 Kubernetes dashboard or CLI `kubectl` utility:
@@ -405,16 +417,38 @@ microservices patterns, ingress routing etc.
 
 #### 7.1.1. Deploy Istio to K8S cluster
 
-Make sure that Istio 0.7.1 is downloaded and unpacked from
-https://github.com/istio/istio/releases/tag/0.7.1
+Make sure that Istio 1.0.3 is downloaded and unpacked from
+https://github.com/istio/istio/releases/tag/1.0.3
 
-For the purposes of this session we will use `~/Programs/istio-0.7.1` as istio
+For the purposes of this session we will use `~/Programs/istio-1.0.3` as istio
 unpacked directory.
 
 Installing Istio is straightforward:
 
 ```
-kubectl apply -f ~/Programs/istio-0.7.1/install/kubernetes/istio.yaml
+kubectl apply -f ~/Programs/istio-1.0.3/install/kubernetes/helm/istio/templates/crds.yaml
+```
+
+You can manually create deployment using helm `https://istio.io/docs/setup/kubernetes/minimal-install/`
+
+```
+helm template install/kubernetes/helm/istio --name istio --namespace istio-system \
+  --set security.enabled=false \
+  --set ingress.enabled=true \
+  --set gateways.istio-ingressgateway.enabled=false \
+  --set gateways.istio-egressgateway.enabled=false \
+  --set galley.enabled=false \
+  --set sidecarInjectorWebhook.enabled=false \
+  --set mixer.enabled=true \
+  --set prometheus.enabled=false \
+  --set global.proxy.envoyStatsd.enabled=false \
+  --set pilot.sidecar=true > istio.yaml
+```
+or use prepared `istio.yaml` in workshop directory.
+
+```
+kubectl create namespace istio-system
+kubectl apply -f tools/istio.yaml
 ```
 
 Note that sometimes some custom resources are not created (errors printed), in
@@ -453,6 +487,13 @@ details.
 After Jaeger is deployed, it can be accessed through Kubernetes proxy API at
 https://18.233.228.40/api/v1/namespaces/istio-system/services/jaeger-query:80/proxy/
 
+Or you can get jaeger ingress endpoint
+
+```
+kubectl get service -n istio-system jaeger-query -o 'jsonpath={.status.loadBalancer.ingress[0].hostname}'
+```
+
+This will print Load Balancer address such as `af917ccdb5be011e881220ae826d3a5a-1158974335.us-east-1.elb.amazonaws.com` for jaeger server.
 #### 7.1.4. Make note of Istio ingress endpoint
 
 Istio set up its own ingress controller with a cloud specific load balancer.
@@ -470,9 +511,8 @@ your specific address when running corresponding commands below.
 
 #### 7.1.5. Import Grafana dashboards for Istio
 
-In Grafana UI import dashboards from files `microservices/istio-dashboard.json`,
-`microservices/mixer-dashboard.json`, and
-`microservices/istio-dashboard-demo-app.json`
+In Grafana UI import dashboards from files `tools/Istio_Performance_Dashboard.json`,
+`tools/Istio_Workload_Dashboard.json`, and `tools/Pilot_Dashboard.json`
 
 ### 7.2. Fork and clone demo application GitHub projects
 
@@ -630,7 +670,23 @@ and deploy
 
     ```
     vim pkg/colorer/colorer-handler.go
-    ````
+    ```
+    ```
+    import (
+             "log"
+    +        "time"
+             "golang.org/x/net/context"
+           )
+    @@ -12,7 +13,8 @@ type colorerServer struct {
+    
+    // GetEcho returns the feature at the given point.
+    func (s *colorerServer) GetColor(ctx context.Context, msg *GetColorRequest) (*GetColorResponse, error) {
+        log.Printf("Server colorer called with message (%v)", msg)
+    -   return &GetColorResponse{Cold: 0, Hot: 50}, nil
+    +   time.Sleep(time.Duration(15) * time.Millisecond)
+    +   return &GetColorResponse{Cold: 0, Hot: 133}, nil
+    ```
+    
 
 3.  Commit and push changes
 
@@ -652,7 +708,7 @@ To route 10% of the traffic to a new version of `colorer`, create a routing
 rule in `master` namespace.
 
 ```
-kubectl apply -n master -f microservices/route-rule-canary-10.yaml
+kubectl apply -n master -f microservices/virtual-service-canary.yaml
 ```
 
 Review changed response characteristics in Grafana dashboards.

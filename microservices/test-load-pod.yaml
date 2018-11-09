@@ -9,7 +9,7 @@ spec:
     name: main
     command:
     - httperf
-    - --server=af917ccdb5be011e881220ae826d3a5a-1158974335.us-east-1.elb.amazonaws.com
+    - --server=ad5f57668e41f11e882850612da0c7e9-2039368714.us-west-2.elb.amazonaws.com
     - --uri=/webui-master/
-    - --rate=10
+    - --rate=100
     - --num-calls=1000000

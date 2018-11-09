@@ -21,16 +21,50 @@ metadata:
   name: monitoring-istio-envoy
   namespace: istio-system
   annotations:
-    prometheus.io/path: "/metrics"
-    prometheus.io/port: "9102"
+    prometheus.io/path: "/stats/prometheus"
+    prometheus.io/port: "15090"
     prometheus.io/scrape: "true"
 spec:
   ports:
   - name: statsd-prom
-    port: 9102
-    targetPort: 9102
+    port: 15090
+    targetPort: 15090
   selector:
     istio: mixer
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: monitoring-istio-ingressgateway
+  namespace: istio-system
+  annotations:
+    prometheus.io/path: "/stats/prometheus"
+    prometheus.io/port: "15090"
+    prometheus.io/scrape: "true"
+spec:
+  ports:
+  - name: statsd-prom
+    port: 15090
+    targetPort: 15090
+  selector:
+    istio: ingressgateway
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: monitoring-istio-egressgateway
+  namespace: istio-system
+  annotations:
+    prometheus.io/path: "/stats/prometheus"
+    prometheus.io/port: "15090"
+    prometheus.io/scrape: "true"
+spec:
+  ports:
+  - name: statsd-prom
+    port: 15090
+    targetPort: 15090
+  selector:
+    istio: egressgateway    
 ---
 kind: Service
 apiVersion: v1
@@ -65,3 +99,20 @@ spec:
     targetPort: 9093
   selector:
     istio: pilot
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: monitoring-istio-galley
+  namespace: istio-system
+  annotations:
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "9093"
+    prometheus.io/scrape: "true"
+spec:
+  ports:
+  - name: http-monitoring
+    port: 9093
+    targetPort: 9093
+  selector:
+    istio: galley

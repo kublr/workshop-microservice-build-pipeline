@@ -1,0 +1,15 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: colorer-rule
+spec:
+  hosts:
+  - colorer.master.svc.cluster.local
+  http:
+  - route:
+    - destination:
+        host: colorer.master.svc.cluster.local
+      weight: 100
+    - destination:
+        host: colorer.featuredemo.svc.cluster.local
+      weight: 0
